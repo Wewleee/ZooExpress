@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>ЗооЭкспресс — Экспресс-доставка зоотоваров</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background: #f4f7f6; color: #333; }
+    
+    /* Шапка и навигация */
+    header { background: #2e7d32; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    header h1 { font-size: 1.5rem; cursor: pointer; }
+    
+    nav { display: flex; gap: 1rem; }
+    .nav-btn { background: rgba(255, 255, 255, 0.15); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s; }
+    .nav-btn:hover, .nav-btn.active { background: white; color: #2e7d32; }
+    
+    .badge { background: #e53935; color: white; border-radius: 50%; padding: 2px 7px; font-size: 0.75rem; font-weight: bold; }
+    .nav-btn.active .badge { background: #2e7d32; color: white; }
+
+    .container { max-width: 1000px; margin: 2rem auto; padding: 0 1rem; }
+    
+    /* Управление видимостью "страниц" */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* Элементы каталога */
+    .search-box { width: 100%; padding: 0.7rem; border: 1px solid #ccc; border-radius: 6px; margin-bottom: 1rem; font-size: 0.95rem; }
+    .category-filter { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .filter-btn { padding: 0.5rem 1rem; background: #e0e0e0; color: #333; border: none; border-radius: 20px; cursor: pointer; font-weight: 500; }
+    .filter-btn.active { background: #2e7d32; color: white; }
+    
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
+    .card { background: white; padding: 1rem; border-radius: 8px; border: 1px solid #ddd; display: flex; flex-direction: column; justify-content: space-between; position: relative; }
+    .card h3 { font-size: 1.05rem; margin: 0.3rem 0; padding-right: 25px; }
+    .category-badge { display: inline-block; background: #e8f5e9; color: #2e7d32; font-size: 0.75rem; font-weight: bold; padding: 2px 8px; border-radius: 4px; }
+    
+    .fav-btn { position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 1.3rem; cursor: pointer; }
+
+    select, input, button { width: 100%; padding: 0.6rem; margin-top: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
+    button.btn-main { background: #2e7d32; color: white; border: none; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+    button.btn-main:hover:not(:disabled) { background: #1b5e20; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    
+    /* Стили для Корзины и Избранного */
+    .cart-box { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid #eee; }
+    .cart-summary { margin: 1.5rem 0; padding: 1rem; background: #f9f9f9; border-radius: 6px; }
+    .total { font-size: 1.3rem; color: #2e7d32; font-weight: bold; margin-top: 0.5rem; }
+    
+    .delivery-options { margin: 0.8rem 0; font-size: 0.95rem; }
+    .delivery-options label { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.4rem; cursor: pointer; }
+    .delivery-options input { width: auto; margin: 0; }
+
+    /* Всплывающее уведомление (Toast) */
+    #toast { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 8px; padding: 12px; position: fixed; z-index: 1000; right: 20px; bottom: 20px; font-size: 0.9rem; }
+    #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+    @keyframes fadein { from { bottom: 0; opacity: 0; } to { bottom: 20px; opacity: 1; } }
+    @keyframes fadeout { from { bottom: 20px; opacity: 1; } to { bottom: 0; opacity: 0; } }
+
+    .result-box { margin-top: 1rem; padding: 1rem; background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 4px; font-size: 0.9rem; }
+    .email-card { background: #fff; padding: 0.6rem; border: 1px solid #ccc; margin-top: 0.5rem; border-radius: 4px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1 onclick="switchPage('catalog')">🐾 ЗооЭкспресс</h1>
+    <nav>
+      <button class="nav-btn active" id="nav-catalog" onclick="switchPage('catalog')">🏪 Каталог</button>
+      <button class="nav-btn" id="nav-favorites" onclick="switchPage('favorites')">❤️ Избранное <span id="fav-count" class="badge">0</span></button>
+      <button class="nav-btn" id="nav-cart" onclick="switchPage('cart')">🛒 Корзина <span id="cart-count" class="badge">0</span></button>
+    </nav>
+  </header>
+
+  <main class="container">
+    
+    <!-- СТРАНИЦА 1: КАТАЛОГ -->
+    <section id="page-catalog" class="page active">
+      <h2>Каталог товаров</h2>
+      <br>
+      <input type="text" id="search-input" class="search-box" placeholder="🔍 Поиск по названию (например, ProPlan, Frontline)..." oninput="renderCatalog()">
+
+      <div class="category-filter">
+        <button class="filter-btn active" onclick="filterCategory('all', this)">Все товары</button>
+        <button class="filter-btn" onclick="filterCategory('Корма', this)">🦴 Корма</button>
+        <button class="filter-btn" onclick="filterCategory('Лекарства', this)">💊 Лекарства</button>
+        <button class="filter-btn" onclick="filterCategory('Наполнители', this)">📦 Наполнители</button>
+        <button class="filter-btn" onclick="filterCategory('Аксессуары', this)">🧸 Аксессуары</button>
+      </div>
+
+      <div id="product-list" class="grid"></div>
+    </section>
+
+    <!-- СТРАНИЦА 2: ИЗБРАННОЕ -->
+    <section id="page-favorites" class="page">
+      <h2>Ваши избранные товары ❤️</h2>
+      <br>
+      <div id="favorites-list" class="grid"></div>
+    </section>
+
+    <!-- СТРАНИЦА 3: КОРЗИНА И ОФОРМЛЕНИЕ -->
+    <section id="page-cart" class="page">
+      <h2>Корзина заказа 🛒</h2>
+      <br>
+      <div class="cart-box">
+        <div id="cart-items">Корзина пуста</div>
+        
+        <div id="cart-summary-block" class="hidden">
+          <div style="margin-top: 1rem;">
+            <label><strong>Выберите вариант доставки:</strong></label>
+            <div class="delivery-options">
+              <label><input type="radio" name="deliverySpeed" value="standard" checked onchange="updateCartUI()"> Обычная (в течение дня) — базовый тариф</label>
+              <label><input type="radio" name="deliverySpeed" value="express" onchange="updateCartUI()"> ⚡ Экспресс-доставка (за 1 час) + 1500 ₸</label>
+            </div>
+          </div>
+
+          <div class="cart-summary">
+            <p>Общий вес груза: <strong><span id="total-weight">0</span> кг</strong></p>
+            <p>Стоимость доставки: <strong><span id="delivery-fee">0</span> ₸</strong></p>
+            <p class="total">Итого к оплате: <strong><span id="grand-total">0</span> ₸</strong></p>
+          </div>
+
+          <h3>Данные для доставки</h3>
+          <form id="order-form">
+            <input type="text" id="name" placeholder="Ваше имя" required>
+            <input type="email" id="email" placeholder="Ваш Email" required>
+            <input type="tel" id="phone" placeholder="Номер телефона" required>
+            <input type="text" id="address" placeholder="Адрес (улица, дом, квартира)" required>
+            <button type="submit" id="submit-btn" class="btn-main">Оформить заказ</button>
+          </form>
+        </div>
+
+        <div id="order-result" class="result-box hidden"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="toast">Уведомление</div>
+
+  <script>
+    const products = [
+      { id: 1, name: 'Корм ProPlan для собак (Премиум)', pricePerKg: 2500, weights: [5, 10, 15, 20], category: 'Корма' },
+      { id: 2, name: 'Корм Royal Canin для кошек', pricePerKg: 3000, weights: [2, 5, 10], category: 'Корма' },
+      { id: 3, name: 'Корм Brit Care беззерновой', pricePerKg: 3500, weights: [3, 7, 12], category: 'Корма' },
+      { id: 4, name: 'Капли от клещей Frontline', pricePerKg: 15000, weights: [0.1], category: 'Лекарства' },
+      { id: 5, name: 'Витамины для суставов собакам', pricePerKg: 12000, weights: [0.3], category: 'Лекарства' },
+      { id: 6, name: 'Древесный наполнитель SuperCat', pricePerKg: 800, weights: [5, 10, 15], category: 'Наполнители' },
+      { id: 7, name: 'Силикагелевый наполнитель premium', pricePerKg: 2200, weights: [4, 8], category: 'Наполнители' },
+      { id: 8, name: 'Шампунь гипоаллергенный 500мл', pricePerKg: 4000, weights: [0.5], category: 'Аксессуары' },
+      { id: 9, name: 'Когтеточка-столбик с игрушкой', pricePerKg: 3000, weights: [2], category: 'Аксессуары' }
+    ];
+
+    let cart = [];
+    let favorites = [];
+    let currentCategory = 'all';
+
+    // Функция переключения "страниц"
+    function switchPage(pageName) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+
+      document.getElementById(`page-${pageName}`).classList.add('active');
+      document.getElementById(`nav-${pageName}`).classList.add('active');
+
+      if (pageName === 'favorites') renderFavorites();
+      if (pageName === 'cart') updateCartUI();
+    }
+
+    // Отрисовка каталога
+    function renderCatalog() {
+      const container = document.getElementById('product-list');
+      const searchQuery = document.getElementById('search-input').value.toLowerCase();
+      
+      const filtered = products.filter(p => {
+        const matchesCategory = currentCategory === 'all' || p.category === currentCategory;
+        const matchesSearch = p.name.toLowerCase().includes(searchQuery);
+        return matchesCategory && matchesSearch;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<p style="grid-column: 1/-1;">Товары не найдены</p>';
+        return;
+      }
+
+      container.innerHTML = filtered.map(p => renderCardHTML(p)).join('');
+    }
+
+    // Отрисовка Избранного
+    function renderFavorites() {
+      const container = document.getElementById('favorites-list');
+      const favProducts = products.filter(p => favorites.includes(p.id));
+
+      if (favProducts.length === 0) {
+        container.innerHTML = '<p style="grid-column: 1/-1;">Вы пока ничего не добавили в избранное ❤️</p>';
+        return;
+      }
+
+      container.innerHTML = favProducts.map(p => renderCardHTML(p)).join('');
+    }
+
+    // Вспомогательный шаблон карточки
+    function renderCardHTML(p) {
+      const isFav = favorites.includes(p.id);
+      return `
+        <div class="card">
+          <button class="fav-btn" onclick="toggleFavorite(${p.id})">
+            ${isFav ? '❤️' : '🤍'}
+          </button>
+          <div>
+            <span class="category-badge">${p.category}</span>
+            <h3>${p.name}</h3>
+            <p style="font-size: 0.85rem; color: #666;">${p.pricePerKg} ₸ / кг</p>
+            <label style="font-size: 0.85rem;">Фасовка:</label>
+            <select id="weight-${p.id}">
+              ${p.weights.map(w => `<option value="${w}">${w} кг (${Math.round(w * p.pricePerKg)} ₸)</option>`).join('')}
+            </select>
+          </div>
+          <button class="btn-main" onclick="addToCart(${p.id})">В корзину</button>
+        </div>
+      `;
+    }
+
+    function toggleFavorite(id) {
+      if (favorites.includes(id)) {
+        favorites = favorites.filter(favId => favId !== id);
+        showToast('Удалено из избранного');
+      } else {
+        favorites.push(id);
+        showToast('❤️ Добавлено в избранное!');
+      }
+      
+      document.getElementById('fav-count').innerText = favorites.length;
+      renderCatalog();
+      renderFavorites();
+    }
+
+    function filterCategory(category, btnElement) {
+      currentCategory = category;
+      document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+      btnElement.classList.add('active');
+      renderCatalog();
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.innerText = message;
+      toast.className = "show";
+      setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 3000);
+    }
+
+    function addToCart(id) {
+      const p = products.find(prod => prod.id === id);
+      const weightSelect = document.getElementById(`weight-${id}`);
+      const weight = parseFloat(weightSelect.value);
+      const totalPrice = Math.round(weight * p.pricePerKg);
+
+      cart.push({ id: p.id, name: p.name, weight, pricePerKg: p.pricePerKg, totalPrice });
+      showToast(`🛒 ${p.name} добавлен в корзину!`);
+      
+      document.getElementById('cart-count').innerText = cart.length;
+    }
+
+    function removeFromCart(index) {
+      cart.splice(index, 1);
+      document.getElementById('cart-count').innerText = cart.length;
+      updateCartUI();
+    }
+
+    function updateCartUI() {
+      const cartContainer = document.getElementById('cart-items');
+      const summaryBlock = document.getElementById('cart-summary-block');
+
+      if (cart.length === 0) {
+        cartContainer.innerHTML = '<p>Ваша корзина пуста. Перейдите в каталог, чтобы выбрать товары.</p>';
+        summaryBlock.classList.add('hidden');
+        return;
+      }
+
+      summaryBlock.classList.remove('hidden');
+
+      cartContainer.innerHTML = cart.map((item, index) => `
+        <div class="cart-item">
+          <div>
+            <strong>${item.name}</strong><br>
+            <small>Фасовка: ${item.weight} кг (${item.pricePerKg} ₸/кг)</small>
+          </div>
+          <div>
+            <strong style="margin-right: 15px;">${item.totalPrice} ₸</strong>
+            <button onclick="removeFromCart(${index})" style="background:none; border:none; color:red; cursor:pointer; width:auto; font-size:1.1rem;">✕</button>
+          </div>
+        </div>
+      `).join('');
+
+      const totalWeight = parseFloat(cart.reduce((sum, i) => sum + i.weight, 0).toFixed(2));
+      const itemsTotal = cart.reduce((sum, i) => sum + i.totalPrice, 0);
+      
+      let baseDelivery = totalWeight > 0 ? 1000 + Math.round(totalWeight * 100) : 0;
+      const isExpress = document.querySelector('input[name="deliverySpeed"]:checked').value === 'express';
+      const expressSurcharge = isExpress ? 1500 : 0;
+      const totalDelivery = baseDelivery + expressSurcharge;
+
+      document.getElementById('total-weight').innerText = totalWeight;
+      document.getElementById('delivery-fee').innerText = `${totalDelivery} ${isExpress ? '(включая Экспресс)' : ''}`;
+      document.getElementById('grand-total').innerText = itemsTotal + totalDelivery;
+    }
+
+    document.getElementById('order-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      
+      const customerName = document.getElementById('name').value;
+      const email = document.getElementById('email').value;
+      const address = document.getElementById('address').value;
+      const isExpress = document.querySelector('input[name="deliverySpeed"]:checked').value === 'express';
+      
+      const totalWeight = parseFloat(cart.reduce((sum, i) => sum + i.weight, 0).toFixed(2));
+      const itemsTotal = cart.reduce((sum, i) => sum + i.totalPrice, 0);
+      const deliveryFee = (1000 + Math.round(totalWeight * 100)) + (isExpress ? 1500 : 0);
+      const grandTotal = itemsTotal + deliveryFee;
+      const orderId = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      const resultBox = document.getElementById('order-result');
+      resultBox.classList.remove('hidden');
+      resultBox.innerHTML = `
+        <strong>✅ Заказ ${orderId} оформлен!</strong><br>
+        <small>Тариф: ${isExpress ? '⚡ Экспресс (за 1 час)' : 'Обычный'}</small><br><br>
+        <strong>Отправка 3 Email-триггеров:</strong>
+        <div class="email-card">
+          <b>📧 Email #1 (Подтверждение):</b><br>
+          Кому: ${email}<br>
+          "Здравствуйте, ${customerName}! Ваш заказ на ${grandTotal} ₸ принят."
+        </div>
+        <div class="email-card">
+          <b>📧 Email #2 (Курьер в пути):</b><br>
+          "Курьер везет ваш груз (${totalWeight} кг) по адресу: ${address}."
+        </div>
+        <div class="email-card">
+          <b>📧 Email #3 (Доставка):</b><br>
+          "Заказ ${orderId} доставлен. Спасибо за покупку!"
+        </div>
+      `;
+
+      cart = [];
+      document.getElementById('cart-count').innerText = 0;
+      document.getElementById('cart-summary-block').classList.add('hidden');
+      document.getElementById('cart-items').innerHTML = '<p>Заказ передан в обработку!</p>';
+      e.target.reset();
+    });
+
+    renderCatalog();
+  </script>
+</body>
+</html>
