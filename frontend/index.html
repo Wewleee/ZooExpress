@@ -351,5 +351,64 @@
 
     renderCatalog();
   </script>
+<!-- ИИ-Чат виджет -->
+<div id="ai-chat-widget" style="position: fixed; bottom: 20px; right: 20px; z-index: 1000; font-family: sans-serif;">
+    <button id="ai-chat-toggle" style="background: #2563eb; color: white; border: none; border-radius: 50px; padding: 12px 20px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">🐾 ИИ-Ветеринар</button>
+    
+    <div id="ai-chat-box" style="display: none; width: 320px; height: 400px; background: white; border: 1px solid #ccc; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); flex-direction: column; overflow: hidden; margin-bottom: 10px;">
+        <div style="background: #2563eb; color: white; padding: 10px; display: flex; justify-content: space-between; align-items: center; font-weight: bold;">
+            <span>AI Ветеринар ZooExpress</span>
+            <button id="ai-chat-close" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px;">✖</button>
+        </div>
+        <div id="ai-chat-messages" style="flex: 1; padding: 10px; overflow-y: auto; font-size: 14px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="background: #f1f5f9; padding: 8px; border-radius: 8px; max-width: 85%;">Привет! Я виртуальный ветеринар. Какой у вас вопрос по уходу за питомцем?</div>
+        </div>
+        <div style="padding: 10px; border-top: 1px solid #eee; display: flex; gap: 5px;">
+            <input type="text" id="ai-chat-input" placeholder="Спросите о корме или уходе..." style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 6px; outline: none;">
+            <button id="ai-chat-send" style="background: #2563eb; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer;">➤</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const toggleBtn = document.getElementById('ai-chat-toggle');
+    const closeBtn = document.getElementById('ai-chat-close');
+    const chatBox = document.getElementById('ai-chat-box');
+    const sendBtn = document.getElementById('ai-chat-send');
+    const inputField = document.getElementById('ai-chat-input');
+    const messagesContainer = document.getElementById('ai-chat-messages');
+
+    if (toggleBtn && chatBox) {
+        toggleBtn.onclick = () => { chatBox.style.display = 'flex'; toggleBtn.style.display = 'none'; };
+        closeBtn.onclick = () => { chatBox.style.display = 'none'; toggleBtn.style.display = 'block'; };
+
+        async function sendMessage() {
+            const text = inputField.value.trim();
+            if (!text) return;
+
+            messagesContainer.innerHTML += `<div style="background: #dbeafe; padding: 8px; border-radius: 8px; max-width: 85%; align-self: flex-end;">${text}</div>`;
+            inputField.value = '';
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            try {
+                const res = await fetch('http://localhost:3000/api/ai-consultant', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+                const data = await res.json();
+                
+                const reply = data.reply || 'Извините, не удалось получить ответ.';
+                messagesContainer.innerHTML += `<div style="background: #f1f5f9; padding: 8px; border-radius: 8px; max-width: 85%;">${reply}</div>`;
+            } catch (err) {
+                messagesContainer.innerHTML += `<div style="background: #fee2e2; color: #b91c1c; padding: 8px; border-radius: 8px; max-width: 85%;">Ошибка соединения с сервером.</div>`;
+            }
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        sendBtn.onclick = sendMessage;
+        inputField.onkeypress = (e) => { if (e.key === 'Enter') sendMessage(); };
+    }
+</script>
 </body>
 </html>
