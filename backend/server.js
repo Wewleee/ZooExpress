@@ -1,82 +1,92 @@
 const express = require('express');
 const cors = require('cors');
-const { GoogleGenAI } = require('@google/genai');
 
 const app = express();
+
+// Настройки Middleware
 app.use(cors());
 app.use(express.json());
 
-const ai = new GoogleGenAI();
-const MODELS_TO_TRY = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+// Простая имитация базы данных в памяти для заказов
+const ordersDatabase = [];
 
-// --- РОУТ ДЛЯ ОФОРМЛЕНИЯ ЗАКАЗА (возвращаем name, phone, email) ---
+// ==========================================
+// 1. МАРШРУТ: Оформление заказа (Order API)
+// ==========================================
 app.post('/api/orders', (req, res) => {
     try {
-        const { name, phone, email, items, totalWeight, totalCost, deliveryType } = req.body;
-        
-        if (!name || !phone || !items) {
-            return res.status(400).json({ success: false, error: 'Заполните обязательные поля (имя, телефон)' });
+        const { name, phone, email, cart, totalPrice } = req.body;
+
+        // Проверка обязательных полей
+        if (!name || !phone) {
+            return res.status(400).json({ 
+                error: 'Пожалуйста, укажите имя и номер телефона.' 
+            });
         }
 
-        console.log(`Получен новый заказ от ${name} (${phone}, ${email}):`, {
-            items, totalWeight, totalCost, deliveryType
-        });
+        // Формируем объект заказа
+        const newOrder = {
+            id: Date.now(),
+            name,
+            phone,
+            email: email || 'Не указан',
+            cart: cart || [],
+            totalPrice: totalPrice || 0,
+            createdAt: new Date().toISOString()
+        };
 
-        // Здесь можно добавить сохранение в базу данных PostgreSQL, если требуется
+        // Сохраняем в "базу данных"
+        ordersDatabase.push(newOrder);
 
-        res.json({ 
-            success: true, 
+        console.log('--- НОВЫЙ ЗАКАЗ ПОЛУЧЕН ---');
+        console.log(`Имя: ${name}`);
+        console.log(`Телефон: ${phone}`);
+        console.log(`Email: ${email}`);
+        console.log(`Заказ ID: ${newOrder.id}`);
+        console.log('---------------------------');
+
+        return res.status(201).json({
             message: 'Заказ успешно оформлен!',
-            orderInfo: { name, phone, email, totalCost, deliveryType }
+            orderId: newOrder.id
         });
     } catch (error) {
-        console.error('Ошибка при создании заказа:', error);
-        res.status(500).json({ success: false, error: 'Ошибка сервера при оформлении заказа' });
+        console.error('Ошибка при обработке заказа:', error);
+        return res.status(500).json({ error: 'Ошибка сервера при оформлении заказа' });
     }
 });
 
-// --- РОУТ ДЛЯ ИИ-ВЕТЕРИНАРА ---
-app.post('/api/ai-consultant', async (req, res) => {
+// ==========================================
+// 2. МАРШРУТ: Фейковый ИИ-Консультант (AI API)
+// ==========================================
+app.post('/api/ai-consultant', (req, res) => {
     try {
         const { message } = req.body;
-        if (!message) {
-            return res.status(400).json({ error: 'Сообщение не передано' });
+        const text = (message || '').toLowerCase();
+
+        let reply = "";
+
+        // Сценарий ответов по ключевым словам
+        if (text.includes("корм") || text.includes("еда") || text.includes("посоветуй") || text.includes("кушать")) {
+            reply = "Здравствуйте! Для кошек и собак рекомендуем линейку премиум-корма ZooExpress. Подскажите возраст и породу вашего питомца, чтобы подставить идеальный рацион?";
+        } else if (text.includes("болит") || text.includes("врач") || text.includes("помощь") || text.includes("ветеринар") || text.includes("живот")) {
+            reply = "Если ваш питомец чувствует себя плохо, настоятельно рекомендуем обратиться в ближайшую ветеринарную клинику! А для профилактики вы можете заказать у нас витаминные комплексы.";
+        } else if (text.includes("доставка") || text.includes("заказ") || text.includes("оплата") || text.includes("скольку") || text.includes("стоид")) {
+            reply = "Доставка осуществляется день в день при заказе до 18:00. При заказе от 5000 тенге — доставка бесплатно!";
+        } else if (text.includes("привет") || text.includes("здравствуй") || text.includes("хай") || text.includes("добрый")) {
+            reply = "Приветствую! Я виртуальный ветеринарный консультант ZooExpress. Чем могу помочь вам и вашему питомцу сегодня?";
+        } else {
+            reply = "Спасибо за ваш вопрос! Как ваш персональный ИИ-консультант ZooExpress, я рекомендую обратиться к нашему каталогу товаров или задать вопрос про корм и доставку!";
         }
 
-        let responseText = null;
-        let lastError = null;
-
-        for (const modelName of MODELS_TO_TRY) {
-            try {
-                const response = await ai.models.generateContent({
-                    model: modelName,
-                    contents: [
-                        {
-                            role: 'user',
-                            parts: [{ text: `Ты профессиональный ветеринар и консультант зоомагазина "ZooExpress". Отвечай коротко, заботливо и профессионально на вопросы о домашних животных, их питании, уходе и подборе зоотоваров. Вопрос клиента: ${message}` }]
-                        }
-                    ]
-                });
-                responseText = response.text;
-                if (responseText) break;
-            } catch (err) {
-                console.warn(`Модель ${modelName} недоступна, пробуем следующую...`);
-                lastError = err;
-            }
-        }
-
-        if (!responseText) {
-            throw lastError || new Error('Все модели недоступны');
-        }
-
-        res.json({ reply: responseText });
+        return res.json({ reply });
     } catch (error) {
-        console.error('Ошибка ИИ:', error);
-        res.status(500).json({ error: 'Не удалось получить ответ от ИИ-консультанта' });
+        console.error('Ошибка в работе консультанта:', error);
+        return res.status(500).json({ error: 'Не удалось получить ответ от консультанта' });
     }
 });
 
+// Запуск сервера на порту 3000 (со связкой 0.0.0.0 для корректной работы)
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
 });
